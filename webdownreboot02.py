@@ -7,6 +7,7 @@
 
 
 import os
+import logging
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 from google.oauth2.credentials import Credentials
@@ -60,15 +61,18 @@ def main():
     SCOPES = ['https://mail.google.com/']
     EMAIL_FILTER = '<alerts@uptrends.com> is:unread'
 
+
     service = create_service(CLIENT_FILE, API_NAME, API_VERSION, SCOPES)
+    print(service)
     if not service:  # Skipping any errors that would come up when no service is returned
-        return 
+        logging.warning("Can't Find Mail Server!")
+        return True
     
     list_of_emails_found = service.users().messages().list(userId='me', q=EMAIL_FILTER).execute()  # returns a dict
     messages_data = list_of_emails_found.get('messages')  # returns a list
     
     if not messages_data:  # No specific emails was found in the inbox 
-        return
+        return False
     
     top_email_data = messages_data[0]
     email_id = top_email_data.get('id')
@@ -79,11 +83,17 @@ def main():
     service.users().messages().modify(userId='me', id=email_id, body={'removeLabelIds': ['UNREAD']}).execute()
     
     if 'Error: 2000 - TCP connection timed out Monitor' in part_of_email_body:
-        os.system("shutdown /r /t 1") # Restart Server in one second
+        logging.info("Email Found! Communication connection was lost!")
+        return True
+        
     
         
 if __name__ == "__main__":
-    main()
+    logging.basicConfig(filename='status.log', format='%(levelname)s: %(asctime)s: %(message)s', level=logging.INFO)
+    if main():
+        logging.info('Rebooting Server')
+        #os.system('shutdown -r now')
+
     
 
 
